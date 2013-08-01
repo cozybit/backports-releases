@@ -57,3 +57,4 @@ obj-$(CPTCFG_MWIFIEX)	+= mwifiex/
 
 obj-$(CPTCFG_BRCMFMAC)	+= brcm80211/
 obj-$(CPTCFG_BRCMSMAC)	+= brcm80211/
+obj-$(CPTCFG_MWL8787)   += mwl8787/
