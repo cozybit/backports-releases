@@ -808,6 +808,7 @@ enum nl80211_commands {
 	NL80211_CMD_CRIT_PROTOCOL_START,
 	NL80211_CMD_CRIT_PROTOCOL_STOP,
 
+	NL80211_CMD_GET_MESH_SETUP = 0x100,
 	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */

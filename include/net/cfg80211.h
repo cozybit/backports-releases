@@ -1160,7 +1160,7 @@ struct mesh_config {
  */
 struct mesh_setup {
 	struct cfg80211_chan_def chandef;
-	const u8 *mesh_id;
+	u8 *mesh_id;
 	u8 mesh_id_len;
 	u8 sync_method;
 	u8 path_sel_proto;
@@ -2078,6 +2078,9 @@ struct cfg80211_ops {
 	int	(*update_mesh_config)(struct wiphy *wiphy,
 				      struct net_device *dev, u32 mask,
 				      const struct mesh_config *nconf);
+	int	(*get_mesh_setup)(struct wiphy *wiphy,
+				  struct net_device *dev,
+				  struct mesh_setup *setup);
 	int	(*join_mesh)(struct wiphy *wiphy, struct net_device *dev,
 			     const struct mesh_config *conf,
 			     const struct mesh_setup *setup);

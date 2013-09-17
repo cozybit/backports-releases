@@ -4607,6 +4607,76 @@ static int nl80211_get_mesh_config(struct sk_buff *skb,
 	return -ENOBUFS;
 }
 
+static int nl80211_get_mesh_setup(struct sk_buff *skb,
+				  struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct mesh_setup setup;
+	int err = 0;
+	void *hdr;
+	struct nlattr *pinfoattr;
+	struct sk_buff *msg;
+
+	if (wdev->iftype != NL80211_IFTYPE_MESH_POINT)
+		return -EOPNOTSUPP;
+
+	if (!rdev->ops->get_mesh_setup)
+		return -EOPNOTSUPP;
+
+	wdev_lock(wdev);
+	err = rdev->ops->get_mesh_setup(&rdev->wiphy, dev, &setup);
+	wdev_unlock(wdev);
+
+	if (err)
+		return err;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	err = -ENOBUFS;
+	hdr = nl80211hdr_put(msg, info->snd_pid, info->snd_seq, 0,
+			     NL80211_CMD_GET_MESH_SETUP);
+	if (!hdr)
+		goto out;
+
+	if (nla_put(msg, NL80211_ATTR_MESH_ID, setup.mesh_id_len,
+		    setup.mesh_id))
+		goto nla_put_failure;
+
+	pinfoattr = nla_nest_start(msg, NL80211_ATTR_MESH_SETUP);
+	if (!pinfoattr)
+		goto nla_put_failure;
+
+	if (nla_put_u8(msg, NL80211_MESH_SETUP_ENABLE_VENDOR_SYNC,
+		       setup.sync_method) ||
+	    nla_put_u8(msg, NL80211_MESH_SETUP_ENABLE_VENDOR_PATH_SEL,
+		       setup.path_sel_proto) ||
+	    nla_put_u8(msg, NL80211_MESH_SETUP_ENABLE_VENDOR_METRIC,
+		       setup.path_metric) ||
+	    (setup.is_authenticated &&
+	     nla_put_flag(msg, NL80211_MESH_SETUP_USERSPACE_AUTH)) ||
+	    (setup.is_secure &&
+	     nla_put_flag(msg, NL80211_MESH_SETUP_USERSPACE_AMPE)))
+		goto nla_put_failure;
+
+	nla_nest_end(msg, pinfoattr);
+	genlmsg_end(msg, hdr);
+	return genlmsg_reply(msg, info);
+
+ nla_put_failure:
+	genlmsg_cancel(msg, hdr);
+ out:
+	nlmsg_free(msg);
+	kfree(setup.mesh_id);
+	return err;
+
+}
+
 static const struct nla_policy nl80211_meshconf_params_policy[NL80211_MESHCONF_ATTR_MAX+1] = {
 	[NL80211_MESHCONF_RETRY_TIMEOUT] = { .type = NLA_U16 },
 	[NL80211_MESHCONF_CONFIRM_TIMEOUT] = { .type = NLA_U16 },
@@ -8994,6 +9064,14 @@ static struct genl_ops nl80211_ops[] = {
 		.policy = nl80211_policy,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_GET_MESH_SETUP,
+		.doit = nl80211_get_mesh_setup,
+		.policy = nl80211_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV |
 				  NL80211_FLAG_NEED_RTNL,
 	}
 };
