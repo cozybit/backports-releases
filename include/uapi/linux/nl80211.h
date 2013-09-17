@@ -841,6 +841,7 @@ enum nl80211_commands {
 	NL80211_CMD_GET_COALESCE,
 	NL80211_CMD_SET_COALESCE,
 
+	NL80211_CMD_GET_MESH_SETUP = 0x100,
 	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */

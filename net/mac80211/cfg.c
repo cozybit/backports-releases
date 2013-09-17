@@ -1773,6 +1773,36 @@ static int copy_mesh_setup(struct ieee80211_if_mesh *ifmsh,
 	return 0;
 }
 
+static int ieee80211_get_mesh_setup(struct wiphy *wiphy,
+				    struct net_device *dev,
+				    struct mesh_setup *setup)
+{
+	struct ieee80211_sub_if_data *sdata;
+	struct ieee80211_if_mesh *ifmsh;
+
+	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	ifmsh = &sdata->u.mesh;
+
+	if (!ifmsh->mesh_id_len)
+		return -ENOLINK;
+
+	setup->mesh_id = kmalloc(ifmsh->mesh_id_len, GFP_KERNEL);
+	if (!setup->mesh_id)
+		return -ENOMEM;
+
+	setup->mesh_id_len = ifmsh->mesh_id_len;
+	memcpy(setup->mesh_id, ifmsh->mesh_id, setup->mesh_id_len);
+	setup->sync_method = ifmsh->mesh_sp_id;
+	setup->path_sel_proto = ifmsh->mesh_pp_id;
+	setup->path_metric = ifmsh->mesh_pm_id;
+	setup->is_authenticated = ifmsh->security & IEEE80211_MESH_SEC_AUTHED;
+	setup->is_secure = ifmsh->security & IEEE80211_MESH_SEC_SECURED;
+
+	memcpy(setup->mcast_rate, sdata->vif.bss_conf.mcast_rate,
+		sizeof(sdata->vif.bss_conf.mcast_rate));
+	return 0;
+}
+
 static int ieee80211_update_mesh_config(struct wiphy *wiphy,
 					struct net_device *dev, u32 mask,
 					const struct mesh_config *nconf)
@@ -3444,6 +3474,7 @@ struct cfg80211_ops mac80211_config_ops = {
 	.dump_mpath = ieee80211_dump_mpath,
 	.update_mesh_config = ieee80211_update_mesh_config,
 	.get_mesh_config = ieee80211_get_mesh_config,
+	.get_mesh_setup = ieee80211_get_mesh_setup,
 	.join_mesh = ieee80211_join_mesh,
 	.leave_mesh = ieee80211_leave_mesh,
 #endif
