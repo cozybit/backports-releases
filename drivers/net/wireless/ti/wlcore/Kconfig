@@ -14,7 +14,6 @@ config WLCORE
 	  unsure.
 
 config WLCORE_SPI
-	depends on !BACKPORT_KERNEL_2_6_25
 	tristate "TI wlcore SPI support"
 	depends on m
 	depends on WLCORE && SPI_MASTER

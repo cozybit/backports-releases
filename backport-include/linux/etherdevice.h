@@ -64,6 +64,7 @@ static inline void eth_broadcast_addr(u8 *addr)
  * Generate a random Ethernet address (MAC) that is not multicast
  * and has the local assigned bit set.
  */
+#define eth_random_addr LINUX_BACKPORT(eth_random_addr)
 static inline void eth_random_addr(u8 *addr)
 {
 	get_random_bytes(addr, ETH_ALEN);
@@ -89,6 +90,7 @@ static inline void eth_zero_addr(u8 *addr)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
+#define ether_addr_equal LINUX_BACKPORT(ether_addr_equal)
 static inline bool ether_addr_equal(const u8 *addr1, const u8 *addr2)
 {
 	return !compare_ether_addr(addr1, addr2);
@@ -111,6 +113,14 @@ static inline int is_unicast_ether_addr(const u8 *addr)
 	return !is_multicast_ether_addr(addr);
 }
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0)
+#define eth_prepare_mac_addr_change LINUX_BACKPORT(eth_prepare_mac_addr_change)
+extern int eth_prepare_mac_addr_change(struct net_device *dev, void *p);
+
+#define eth_commit_mac_addr_change LINUX_BACKPORT(eth_commit_mac_addr_change)
+extern void eth_commit_mac_addr_change(struct net_device *dev, void *p);
+#endif /* < 3.9 */
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29)
 #define eth_mac_addr LINUX_BACKPORT(eth_mac_addr)
