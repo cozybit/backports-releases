@@ -15,3 +15,5 @@ ath-objs :=	main.o \
 
 ath-$(CPTCFG_ATH_DEBUG) += debug.o
 ccflags-y += -D__CHECK_ENDIAN__
+
+obj-$(CPTCFG_WCN36XX)     += wcn36xx/
