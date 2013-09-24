@@ -4592,7 +4592,7 @@ static int nl80211_get_mesh_config(struct sk_buff *skb,
 	if (!msg)
 		return -ENOMEM;
 	hdr = nl80211hdr_put(msg, genl_info_snd_portid(info), info->snd_seq, 0,
-			     NL80211_CMD_GET_MESH_CONFIG);
+			     (u8)NL80211_CMD_GET_MESH_CONFIG);
 	if (!hdr)
 		goto out;
 	pinfoattr = nla_nest_start(msg, NL80211_ATTR_MESH_CONFIG);
@@ -4700,7 +4700,7 @@ static int nl80211_get_mesh_setup(struct sk_buff *skb,
 
 	err = -ENOBUFS;
 	hdr = nl80211hdr_put(msg, info->snd_pid, info->snd_seq, 0,
-			     NL80211_CMD_GET_MESH_SETUP);
+			     (u8)NL80211_CMD_GET_MESH_SETUP);
 	if (!hdr)
 		goto out;
 
@@ -9020,7 +9020,7 @@ static struct genl_ops nl80211_ops[] = {
 		.flags = GENL_ADMIN_PERM,
 	},
 	{
-		.cmd = NL80211_CMD_GET_MESH_CONFIG,
+		.cmd = (u8)NL80211_CMD_GET_MESH_CONFIG,
 		.doit = nl80211_get_mesh_config,
 		.policy = nl80211_policy,
 		/* can be retrieved by unprivileged users */
@@ -9439,11 +9439,11 @@ static struct genl_ops nl80211_ops[] = {
 				  NL80211_FLAG_NEED_RTNL,
     },
     {
-		.cmd = NL80211_CMD_GET_MESH_SETUP,
+		.cmd = (u8)NL80211_CMD_GET_MESH_SETUP,
 		.doit = nl80211_get_mesh_setup,
 		.policy = nl80211_policy,
 		.flags = GENL_ADMIN_PERM,
-		.internal_flags = NL80211_FLAG_NEED_NETDEV |
+		.internal_flags = NL80211_FLAG_NEED_NETDEV
 	}
 };
 
