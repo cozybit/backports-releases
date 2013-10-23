@@ -12,6 +12,7 @@
 #include <asm/unaligned.h>
 #include "wme.h"
 #include "mesh.h"
+#include "driver-ops.h"
 
 #define TEST_FRAME_LEN	8192
 #define MAX_METRIC	0xffffffff
@@ -385,6 +386,12 @@ static u32 hwmp_route_info_get(struct ieee80211_sub_if_data *sdata,
 	u32 last_hop_metric, new_metric;
 	bool process = true;
 
+    struct ieee80211_link_stats link_stats;                                     
+    bool updated_stats;                                                         
+                                                                               
+    updated_stats = drv_get_link_stats(local, sdata, mgmt->sa,                  
+                       &link_stats) == 0;                                       
+                    
 	rcu_read_lock();
 	sta = sta_info_get(sdata, mgmt->sa);
 	if (!sta) {
@@ -392,6 +399,11 @@ static u32 hwmp_route_info_get(struct ieee80211_sub_if_data *sdata,
 		return 0;
 	}
 
+    if (updated_stats) {                                                        
+        sta->fail_avg = link_stats.fail_avg;                                    
+        sta->last_tx_rate = link_stats.last_tx_rate;                            
+    }                                                                           
+   
 	last_hop_metric = airtime_link_metric_get(local, sta);
 	/* Update and check originator routing info */
 	fresh_info = true;
@@ -772,6 +784,8 @@ static void hwmp_rann_frame_process(struct ieee80211_sub_if_data *sdata,
 	const u8 *orig_addr;
 	u32 orig_sn, metric, metric_txsta, interval;
 	bool root_is_gate;
+    struct ieee80211_link_stats link_stats;                                     
+    bool updated_stats; 
 
 	ttl = rann->rann_ttl;
 	flags = rann->rann_flags;
@@ -791,6 +805,9 @@ static void hwmp_rann_frame_process(struct ieee80211_sub_if_data *sdata,
 		  "received RANN from %pM via neighbour %pM (is_gate=%d)\n",
 		  orig_addr, mgmt->sa, root_is_gate);
 
+    updated_stats = drv_get_link_stats(local, sdata, mgmt->sa,                  
+                       &link_stats) == 0;                                       
+ 
 	rcu_read_lock();
 	sta = sta_info_get(sdata, mgmt->sa);
 	if (!sta) {
@@ -798,8 +815,13 @@ static void hwmp_rann_frame_process(struct ieee80211_sub_if_data *sdata,
 		return;
 	}
 
-	metric_txsta = airtime_link_metric_get(local, sta);
+    if (updated_stats) {                                                        
+        sta->fail_avg = link_stats.fail_avg;                                    
+        sta->last_tx_rate = link_stats.last_tx_rate;                            
+    }                                                                           
 
+	metric_txsta = airtime_link_metric_get(local, sta);
+  
 	mpath = mesh_path_lookup(sdata, orig_addr);
 	if (!mpath) {
 		mpath = mesh_path_add(sdata, orig_addr);
