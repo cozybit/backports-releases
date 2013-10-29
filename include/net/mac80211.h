@@ -217,11 +217,14 @@ struct ieee80211_chanctx_conf {
  * @BSS_CHANGED_TXPOWER: TX power setting changed for this interface
  * @BSS_CHANGED_P2P_PS: P2P powersave settings (CTWindow, opportunistic PS)
  *	changed (currently only in P2P client mode, GO mode will be later)
- * @BSS_CHANGED_BEACON_INFO: Data from the AP's beacon became available:
- *	currently dtim_period only is under consideration.
+ * @BSS_CHANGED_DTIM_PERIOD: the DTIM period value was changed (set when
+ *	it becomes valid, managed mode only)
  * @BSS_CHANGED_BANDWIDTH: The bandwidth used by this interface changed,
  *	note that this is only called when it changes after the channel
  *	context had been assigned.
+ *@BSS_CHANGED_LOW_ACK_COUNT: The low ack count notification threshold for this
+ *	interface changed.
+ *@BSS_CHANGED_MCAST_RATE: The multicast data frame rate for this BSS changed.
  */
 enum ieee80211_bss_change {
 	BSS_CHANGED_ASSOC		= 1<<0,
@@ -244,8 +247,10 @@ enum ieee80211_bss_change {
 	BSS_CHANGED_PS			= 1<<17,
 	BSS_CHANGED_TXPOWER		= 1<<18,
 	BSS_CHANGED_P2P_PS		= 1<<19,
-	BSS_CHANGED_BEACON_INFO		= 1<<20,
+	BSS_CHANGED_DTIM_PERIOD		= 1<<20,
 	BSS_CHANGED_BANDWIDTH		= 1<<21,
+	BSS_CHANGED_LOW_ACK_COUNT	= 1<<22,
+	BSS_CHANGED_MCAST_RATE		= 1<<23,
 
 	/* when adding here, make sure to change ieee80211_reconfig */
 };
@@ -288,7 +293,7 @@ enum ieee80211_rssi_event {
  *	IEEE80211_HW_2GHZ_SHORT_SLOT_INCAPABLE hardware flag
  * @dtim_period: num of beacons before the next DTIM, for beaconing,
  *	valid in station mode only if after the driver was notified
- *	with the %BSS_CHANGED_BEACON_INFO flag, will be non-zero then.
+ *	with the %BSS_CHANGED_DTIM_PERIOD flag, will be non-zero then.
  * @sync_tsf: last beacon's/probe response's TSF timestamp (could be old
  *	as it may have been received during scanning long ago). If the
  *	HW flag %IEEE80211_HW_TIMING_BEACON_ONLY is set, then this can
@@ -305,7 +310,6 @@ enum ieee80211_rssi_event {
  * @basic_rates: bitmap of basic rates, each bit stands for an
  *	index into the rate table configured by the driver in
  *	the current band.
- * @beacon_rate: associated AP's beacon TX rate
  * @mcast_rate: per-band multicast rate index + 1 (0: disabled)
  * @bssid: The BSSID for this BSS
  * @enable_beacon: whether beaconing should be enabled or not
@@ -334,6 +338,7 @@ enum ieee80211_rssi_event {
  * @hidden_ssid: The SSID of the current vif is hidden. Only valid in AP-mode.
  * @txpower: TX power in dBm
  * @p2p_noa_attr: P2P NoA attribute for P2P powersave
+ * @low_ack_count: Current low ACK count notification threshold.
  */
 struct ieee80211_bss_conf {
 	const u8 *bssid;
@@ -353,7 +358,6 @@ struct ieee80211_bss_conf {
 	u32 sync_device_ts;
 	u8 sync_dtim_count;
 	u32 basic_rates;
-	struct ieee80211_rate *beacon_rate;
 	int mcast_rate[IEEE80211_NUM_BANDS];
 	u16 ht_operation_mode;
 	s32 cqm_rssi_thold;
@@ -368,6 +372,7 @@ struct ieee80211_bss_conf {
 	size_t ssid_len;
 	bool hidden_ssid;
 	int txpower;
+	int low_ack_count;
 	struct ieee80211_p2p_noa_attr p2p_noa_attr;
 };
 
@@ -462,8 +467,6 @@ struct ieee80211_bss_conf {
  * @IEEE80211_TX_CTL_DONTFRAG: Don't fragment this packet even if it
  *	would be fragmented by size (this is optional, only used for
  *	monitor injection).
- * @IEEE80211_TX_CTL_PS_RESPONSE: This frame is a response to a poll
- *	frame (PS-Poll or uAPSD).
  *
  * Note: If you have to add new flags to the enumeration, then don't
  *	 forget to update %IEEE80211_TX_TEMPORARY_FLAGS when necessary.
@@ -499,7 +502,6 @@ enum mac80211_tx_control_flags {
 	IEEE80211_TX_STATUS_EOSP		= BIT(28),
 	IEEE80211_TX_CTL_USE_MINRATE		= BIT(29),
 	IEEE80211_TX_CTL_DONTFRAG		= BIT(30),
-	IEEE80211_TX_CTL_PS_RESPONSE		= BIT(31),
 };
 
 #define IEEE80211_TX_CTL_STBC_SHIFT		23
@@ -810,9 +812,6 @@ ieee80211_tx_info_clear_status(struct ieee80211_tx_info *info)
  *	on this subframe
  * @RX_FLAG_AMPDU_DELIM_CRC_KNOWN: The delimiter CRC field is known (the CRC
  *	is stored in the @ampdu_delimiter_crc field)
- * @RX_FLAG_STBC_MASK: STBC 2 bit bitmask. 1 - Nss=1, 2 - Nss=2, 3 - Nss=3
- * @RX_FLAG_10MHZ: 10 MHz (half channel) was used
- * @RX_FLAG_5MHZ: 5 MHz (quarter channel) was used
  */
 enum mac80211_rx_flags {
 	RX_FLAG_MMIC_ERROR		= BIT(0),
@@ -840,12 +839,7 @@ enum mac80211_rx_flags {
 	RX_FLAG_80MHZ			= BIT(23),
 	RX_FLAG_80P80MHZ		= BIT(24),
 	RX_FLAG_160MHZ			= BIT(25),
-	RX_FLAG_STBC_MASK		= BIT(26) | BIT(27),
-	RX_FLAG_10MHZ			= BIT(28),
-	RX_FLAG_5MHZ			= BIT(29),
 };
-
-#define RX_FLAG_STBC_SHIFT		26
 
 /**
  * struct ieee80211_rx_status - receive status
@@ -863,10 +857,6 @@ enum mac80211_rx_flags {
  * @signal: signal strength when receiving this frame, either in dBm, in dB or
  *	unspecified depending on the hardware capabilities flags
  *	@IEEE80211_HW_SIGNAL_*
- * @chains: bitmask of receive chains for which separate signal strength
- *	values were filled.
- * @chain_signal: per-chain signal strength, in dBm (unlike @signal, doesn't
- *	support dB or unspecified units)
  * @antenna: antenna used
  * @rate_idx: index of data rate into band's supported rates or MCS index if
  *	HT or VHT is used (%RX_FLAG_HT/%RX_FLAG_VHT)
@@ -898,8 +888,6 @@ struct ieee80211_rx_status {
 	u8 band;
 	u8 antenna;
 	s8 signal;
-	u8 chains;
-	s8 chain_signal[IEEE80211_MAX_CHAINS];
 	u8 ampdu_delimiter_crc;
 	u8 vendor_radiotap_align;
 	u8 vendor_radiotap_oui[3];
@@ -909,12 +897,12 @@ struct ieee80211_rx_status {
 /**
  * struct ieee80211_link_stats - information about link adaptation
  *
- * @fail_avg: estimated frame error rate
+ * @fail_avg: estimated frame error rate for @last_tx_rate
  * @last_tx_rate: rate used in last successful transmission
  */
 struct ieee80211_link_stats {
-   unsigned int fail_avg;
-   struct ieee80211_tx_rate last_tx_rate;
+	unsigned int fail_avg;
+	struct ieee80211_tx_rate last_tx_rate;
 };
 
 /**
@@ -1019,11 +1007,11 @@ enum ieee80211_smps_mode {
  * @radar_enabled: whether radar detection is enabled
  *
  * @long_frame_max_tx_count: Maximum number of transmissions for a "long" frame
- *	(a frame not RTS protected), called "dot11LongRetryLimit" in 802.11,
- *	but actually means the number of transmissions not the number of retries
+ *    (a frame not RTS protected), called "dot11LongRetryLimit" in 802.11,
+ *    but actually means the number of transmissions not the number of retries
  * @short_frame_max_tx_count: Maximum number of transmissions for a "short"
- *	frame, called "dot11ShortRetryLimit" in 802.11, but actually means the
- *	number of transmissions not the number of retries
+ *    frame, called "dot11ShortRetryLimit" in 802.11, but actually means the
+ *    number of transmissions not the number of retries
  *
  * @smps_mode: spatial multiplexing powersave mode; note that
  *	%IEEE80211_SMPS_STATIC is used when the device is not
@@ -1107,7 +1095,7 @@ enum ieee80211_vif_flags {
  *	be off when it is %NULL there can still be races and packets could be
  *	processed after it switches back to %NULL.
  * @debugfs_dir: debugfs dentry, can be used by drivers to create own per
- *	interface debug files. Note that it will be NULL for the virtual
+ *      interface debug files. Note that it will be NULL for the virtual
  *	monitor interface (if that is requested.)
  * @drv_priv: data area for driver use, will always be aligned to
  *	sizeof(void *).
@@ -1265,7 +1253,7 @@ enum ieee80211_sta_rx_bandwidth {
  * struct ieee80211_sta_rates - station rate selection table
  *
  * @rcu_head: RCU head used for freeing the table on update
- * @rate: transmit rates/flags to be used by default.
+ * @rates: transmit rates/flags to be used by default.
  *	Overriding entries per-packet is possible by using cb tx control.
  */
 struct ieee80211_sta_rates {
@@ -1306,7 +1294,7 @@ struct ieee80211_sta_rates {
  *	notifications and capabilities. The value is only valid after
  *	the station moves to associated state.
  * @smps_mode: current SMPS mode (off, static or dynamic)
- * @rates: rate control selection table
+ * @tx_rates: rate control selection table
  */
 struct ieee80211_sta {
 	u32 supp_rates[IEEE80211_NUM_BANDS];
@@ -1440,10 +1428,10 @@ struct ieee80211_tx_control {
  *	the stack.
  *
  * @IEEE80211_HW_CONNECTION_MONITOR:
- *	The hardware performs its own connection monitoring, including
- *	periodic keep-alives to the AP and probing the AP on beacon loss.
- *	When this flag is set, signaling beacon-loss will cause an immediate
- *	change to disassociated state.
+ *      The hardware performs its own connection monitoring, including
+ *      periodic keep-alives to the AP and probing the AP on beacon loss.
+ *      When this flag is set, signaling beacon-loss will cause an immediate
+ *      change to disassociated state.
  *
  * @IEEE80211_HW_NEED_DTIM_BEFORE_ASSOC:
  *	This device needs to get data from beacon before association (i.e.
@@ -1541,10 +1529,10 @@ enum ieee80211_hw_flags {
  * @channel_change_time: time (in microseconds) it takes to change channels.
  *
  * @max_signal: Maximum value for signal (rssi) in RX information, used
- *	only when @IEEE80211_HW_SIGNAL_UNSPEC or @IEEE80211_HW_SIGNAL_DB
+ *     only when @IEEE80211_HW_SIGNAL_UNSPEC or @IEEE80211_HW_SIGNAL_DB
  *
  * @max_listen_interval: max listen interval in units of beacon interval
- *	that HW supports
+ *     that HW supports
  *
  * @queues: number of available hardware transmit queues for
  *	data packets. WMM/QoS requires at least four, these
@@ -2458,7 +2446,7 @@ enum ieee80211_roc_type {
  *	The callback can sleep.
  *
  * @set_tsf: Set the TSF timer to the specified value in the firmware/hardware.
- *	Currently, this is only used for IBSS mode debugging. Is not a
+ *      Currently, this is only used for IBSS mode debugging. Is not a
  *	required function.
  *	The callback can sleep.
  *
@@ -2501,8 +2489,8 @@ enum ieee80211_roc_type {
  * @get_survey: Return per-channel survey information
  *
  * @get_link_stats: If your hardware implements rate control in firmware,
- * implement this function to provide some link metric information
- * useful for mesh.
+ *	implement this function to provide some link metric information
+ *	useful for mesh.
  *
  * @rfkill_poll: Poll rfkill hardware state. If you need this, you also
  *	need to set wiphy->rfkill_poll to %true before registration,
@@ -2652,6 +2640,11 @@ enum ieee80211_roc_type {
  * @ipv6_addr_change: IPv6 address assignment on the given interface changed.
  *	Currently, this is only called for managed or P2P client interfaces.
  *	This callback is optional; it must not sleep.
+ *
+ * @mesh_ps_doze: Put the device to doze state now; schedule wakeup at given
+ *	TSF value (if non-zero). This callback is optional and may sleep.
+ * @mesh_ps_wakeup: Wake the device up now. This callback is optional and may
+ *	sleep.
  */
 struct ieee80211_ops {
 	void (*tx)(struct ieee80211_hw *hw,
@@ -2772,10 +2765,10 @@ struct ieee80211_ops {
 			    u8 buf_size);
 	int (*get_survey)(struct ieee80211_hw *hw, int idx,
 		struct survey_info *survey);
-   int (*get_link_stats)(struct ieee80211_hw *hw,                              
-                 struct ieee80211_vif *vif,                                    
-                 u8 *peer_addr,                                                
-                 struct ieee80211_link_stats *link_stats); 
+	int (*get_link_stats)(struct ieee80211_hw *hw,
+			      struct ieee80211_vif *vif,
+			      u8 *peer_addr,
+			      struct ieee80211_link_stats *link_stats);
 	void (*rfkill_poll)(struct ieee80211_hw *hw);
 	void (*set_coverage_class)(struct ieee80211_hw *hw, u8 coverage_class);
 #ifdef CPTCFG_NL80211_TESTMODE
@@ -2853,6 +2846,11 @@ struct ieee80211_ops {
 				 struct ieee80211_vif *vif,
 				 struct inet6_dev *idev);
 #endif
+
+#ifdef CPTCFG_MAC80211_MESH
+	void (*mesh_ps_doze)(struct ieee80211_hw *hw, u64 nexttbtt);
+	void (*mesh_ps_wakeup)(struct ieee80211_hw *hw);
+#endif
 };
 
 /**
@@ -2910,14 +2908,14 @@ enum ieee80211_tpt_led_trigger_flags {
 };
 
 #ifdef CPTCFG_MAC80211_LEDS
-char *__ieee80211_get_tx_led_name(struct ieee80211_hw *hw);
-char *__ieee80211_get_rx_led_name(struct ieee80211_hw *hw);
-char *__ieee80211_get_assoc_led_name(struct ieee80211_hw *hw);
-char *__ieee80211_get_radio_led_name(struct ieee80211_hw *hw);
-char *__ieee80211_create_tpt_led_trigger(struct ieee80211_hw *hw,
-					 unsigned int flags,
-					 const struct ieee80211_tpt_blink *blink_table,
-					 unsigned int blink_table_len);
+extern char *__ieee80211_get_tx_led_name(struct ieee80211_hw *hw);
+extern char *__ieee80211_get_rx_led_name(struct ieee80211_hw *hw);
+extern char *__ieee80211_get_assoc_led_name(struct ieee80211_hw *hw);
+extern char *__ieee80211_get_radio_led_name(struct ieee80211_hw *hw);
+extern char *__ieee80211_create_tpt_led_trigger(
+				struct ieee80211_hw *hw, unsigned int flags,
+				const struct ieee80211_tpt_blink *blink_table,
+				unsigned int blink_table_len);
 #endif
 /**
  * ieee80211_get_tx_led_name - get name of TX LED
@@ -3290,6 +3288,18 @@ static inline void ieee80211_tx_status_ni(struct ieee80211_hw *hw,
  */
 void ieee80211_tx_status_irqsafe(struct ieee80211_hw *hw,
 				 struct sk_buff *skb);
+
+/**
+ * ieee80211_monitor_tx_rx - IRQ-safe?
+ *
+ * description here
+ *
+ * @hw: the hardware the frame was transmitted by.
+ * @skb: the frame that was transmitted, freed by this function.
+ * @retry_count: number of attempts which were made.
+ */
+void ieee80211_monitor_tx_rx(struct ieee80211_hw *hw,
+			     struct sk_buff *skb, int retry_count);
 
 /**
  * ieee80211_report_low_ack - report non-responding station
@@ -4237,10 +4247,8 @@ struct rate_control_ops {
 
 	void *(*alloc_sta)(void *priv, struct ieee80211_sta *sta, gfp_t gfp);
 	void (*rate_init)(void *priv, struct ieee80211_supported_band *sband,
-			  struct cfg80211_chan_def *chandef,
 			  struct ieee80211_sta *sta, void *priv_sta);
 	void (*rate_update)(void *priv, struct ieee80211_supported_band *sband,
-			    struct cfg80211_chan_def *chandef,
 			    struct ieee80211_sta *sta, void *priv_sta,
 			    u32 changed);
 	void (*free_sta)(void *priv, struct ieee80211_sta *sta,

@@ -296,7 +296,6 @@ struct ath_tx {
 	struct ath_txq txq[ATH9K_NUM_TX_QUEUES];
 	struct ath_descdma txdma;
 	struct ath_txq *txq_map[IEEE80211_NUM_ACS];
-	struct ath_txq *uapsdq;
 	u32 txq_max_pending[IEEE80211_NUM_ACS];
 	u16 max_aggr_framelen[IEEE80211_NUM_ACS][4][32];
 };
@@ -344,8 +343,6 @@ int ath_txq_update(struct ath_softc *sc, int qnum,
 void ath_update_max_aggr_framelen(struct ath_softc *sc, int queue, int txop);
 int ath_tx_start(struct ieee80211_hw *hw, struct sk_buff *skb,
 		 struct ath_tx_control *txctl);
-void ath_tx_cabq(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-		 struct sk_buff *skb);
 void ath_tx_tasklet(struct ath_softc *sc);
 void ath_tx_edma_tasklet(struct ath_softc *sc);
 int ath_tx_aggr_start(struct ath_softc *sc, struct ieee80211_sta *sta,
@@ -356,11 +353,6 @@ void ath_tx_aggr_resume(struct ath_softc *sc, struct ieee80211_sta *sta, u16 tid
 void ath_tx_aggr_wakeup(struct ath_softc *sc, struct ath_node *an);
 void ath_tx_aggr_sleep(struct ieee80211_sta *sta, struct ath_softc *sc,
 		       struct ath_node *an);
-void ath9k_release_buffered_frames(struct ieee80211_hw *hw,
-				   struct ieee80211_sta *sta,
-				   u16 tids, int nframes,
-				   enum ieee80211_frame_release_type reason,
-				   bool more_data);
 
 /********/
 /* VIFs */
@@ -591,6 +583,13 @@ static inline void ath_fill_led_pin(struct ath_softc *sc)
 #define ATH_ANT_DIV_COMB_LNA1_DELTA_MID -2
 #define ATH_ANT_DIV_COMB_LNA1_DELTA_LOW 2
 
+enum ath9k_ant_div_comb_lna_conf {
+	ATH_ANT_DIV_COMB_LNA1_MINUS_LNA2,
+	ATH_ANT_DIV_COMB_LNA2,
+	ATH_ANT_DIV_COMB_LNA1,
+	ATH_ANT_DIV_COMB_LNA1_PLUS_LNA2,
+};
+
 struct ath_ant_comb {
 	u16 count;
 	u16 total_pkt_count;
@@ -609,7 +608,7 @@ struct ath_ant_comb {
 	int rssi_third;
 	bool alt_good;
 	int quick_scan_cnt;
-	enum ath9k_ant_div_comb_lna_conf main_conf;
+	int main_conf;
 	enum ath9k_ant_div_comb_lna_conf first_quick_scan_conf;
 	enum ath9k_ant_div_comb_lna_conf second_quick_scan_conf;
 	bool first_ratio;
@@ -623,11 +622,6 @@ void ath_ant_comb_update(struct ath_softc *sc);
 /********************/
 /* Main driver core */
 /********************/
-
-#define ATH9K_PCI_CUS198 0x0001
-#define ATH9K_PCI_CUS230 0x0002
-#define ATH9K_PCI_CUS217 0x0004
-#define ATH9K_PCI_WOW    0x0008
 
 /*
  * Default cache line size, in bytes.
@@ -648,7 +642,6 @@ enum sc_op_flags {
 	SC_OP_ANI_RUN,
 	SC_OP_PRIM_STA_VIF,
 	SC_OP_HW_RESET,
-	SC_OP_SCANNING,
 };
 
 /* Powersave flags */
@@ -713,7 +706,6 @@ struct ath_softc {
 
 	unsigned int hw_busy_count;
 	unsigned long sc_flags;
-	unsigned long driver_data;
 
 	u32 intrstatus;
 	u16 ps_flags; /* PS_* */
@@ -763,6 +755,7 @@ struct ath_softc {
 	struct rchan *rfs_chan_spec_scan;
 	enum spectral_mode spectral_mode;
 	struct ath_spec_scan spec_config;
+	int scanning;
 
 #ifdef CONFIG_PM_SLEEP
 	atomic_t wow_got_bmiss_intr;

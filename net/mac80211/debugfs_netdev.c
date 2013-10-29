@@ -228,9 +228,9 @@ static int ieee80211_set_smps(struct ieee80211_sub_if_data *sdata,
 	if (sdata->vif.type != NL80211_IFTYPE_STATION)
 		return -EOPNOTSUPP;
 
-	sdata_lock(sdata);
+	mutex_lock(&sdata->u.mgd.mtx);
 	err = __ieee80211_request_smps(sdata, smps_mode);
-	sdata_unlock(sdata);
+	mutex_unlock(&sdata->u.mgd.mtx);
 
 	return err;
 }
@@ -313,16 +313,16 @@ static ssize_t ieee80211_if_parse_tkip_mic_test(
 	case NL80211_IFTYPE_STATION:
 		fc |= cpu_to_le16(IEEE80211_FCTL_TODS);
 		/* BSSID SA DA */
-		sdata_lock(sdata);
+		mutex_lock(&sdata->u.mgd.mtx);
 		if (!sdata->u.mgd.associated) {
-			sdata_unlock(sdata);
+			mutex_unlock(&sdata->u.mgd.mtx);
 			dev_kfree_skb(skb);
 			return -ENOTCONN;
 		}
 		memcpy(hdr->addr1, sdata->u.mgd.associated->bssid, ETH_ALEN);
 		memcpy(hdr->addr2, sdata->vif.addr, ETH_ALEN);
 		memcpy(hdr->addr3, addr, ETH_ALEN);
-		sdata_unlock(sdata);
+		mutex_unlock(&sdata->u.mgd.mtx);
 		break;
 	default:
 		dev_kfree_skb(skb);
@@ -471,8 +471,6 @@ __IEEE80211_IF_FILE_W(tsf);
 IEEE80211_IF_FILE(peer, u.wds.remote_addr, MAC);
 
 #ifdef CPTCFG_MAC80211_MESH
-IEEE80211_IF_FILE(estab_plinks, u.mesh.estab_plinks, ATOMIC);
-
 /* Mesh stats attributes */
 IEEE80211_IF_FILE(fwded_mcast, u.mesh.mshstats.fwded_mcast, DEC);
 IEEE80211_IF_FILE(fwded_unicast, u.mesh.mshstats.fwded_unicast, DEC);
@@ -482,6 +480,7 @@ IEEE80211_IF_FILE(dropped_frames_congestion,
 		  u.mesh.mshstats.dropped_frames_congestion, DEC);
 IEEE80211_IF_FILE(dropped_frames_no_route,
 		  u.mesh.mshstats.dropped_frames_no_route, DEC);
+IEEE80211_IF_FILE(estab_plinks, u.mesh.estab_plinks, ATOMIC);
 
 /* Mesh parameters */
 IEEE80211_IF_FILE(dot11MeshMaxRetries,
@@ -529,6 +528,56 @@ IEEE80211_IF_FILE(dot11MeshHWMPconfirmationInterval,
 IEEE80211_IF_FILE(power_mode, u.mesh.mshcfg.power_mode, DEC);
 IEEE80211_IF_FILE(dot11MeshAwakeWindowDuration,
 		  u.mesh.mshcfg.dot11MeshAwakeWindowDuration, DEC);
+IEEE80211_IF_FILE(low_ack,
+		  u.mesh.mshcfg.low_ack, DEC);
+
+static ssize_t ieee80211_if_fmt_mcast_retries(
+	const struct ieee80211_sub_if_data *sdata, char *buf, int buflen)
+{
+	return snprintf(buf, buflen, "%d\n", sdata->u.mesh.mshcfg.mcast_retries);
+}
+
+static ssize_t ieee80211_if_parse_mcast_retries(
+	struct ieee80211_sub_if_data *sdata, const char *buf, int buflen)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return -EINVAL;
+
+	if (val < 1 || val > 255)
+		return -ERANGE;
+
+	sdata->u.mesh.mshcfg.mcast_retries = val;
+	return buflen;
+}
+__IEEE80211_IF_FILE_W(mcast_retries);
+
+static ssize_t ieee80211_if_fmt_mcast_ttl(
+	const struct ieee80211_sub_if_data *sdata, char *buf, int buflen)
+{
+	return snprintf(buf, buflen, "%d\n", sdata->u.mesh.mshcfg.mcast_ttl);
+}
+
+static ssize_t ieee80211_if_parse_mcast_ttl(
+	struct ieee80211_sub_if_data *sdata, const char *buf, int buflen)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return -EINVAL;
+
+	if (val < 1 || val > 255)
+		return -ERANGE;
+
+	sdata->u.mesh.mshcfg.mcast_ttl = val;
+	return buflen;
+}
+__IEEE80211_IF_FILE_W(mcast_ttl);
 #endif
 
 #define DEBUGFS_ADD_MODE(name, mode) \
@@ -584,7 +633,6 @@ static void add_wds_files(struct ieee80211_sub_if_data *sdata)
 static void add_mesh_files(struct ieee80211_sub_if_data *sdata)
 {
 	DEBUGFS_ADD_MODE(tsf, 0600);
-	DEBUGFS_ADD_MODE(estab_plinks, 0400);
 }
 
 static void add_mesh_stats(struct ieee80211_sub_if_data *sdata)
@@ -600,6 +648,7 @@ static void add_mesh_stats(struct ieee80211_sub_if_data *sdata)
 	MESHSTATS_ADD(dropped_frames_ttl);
 	MESHSTATS_ADD(dropped_frames_no_route);
 	MESHSTATS_ADD(dropped_frames_congestion);
+	MESHSTATS_ADD(estab_plinks);
 #undef MESHSTATS_ADD
 }
 
@@ -637,6 +686,9 @@ static void add_mesh_config(struct ieee80211_sub_if_data *sdata)
 	MESHPARAMS_ADD(dot11MeshHWMPconfirmationInterval);
 	MESHPARAMS_ADD(power_mode);
 	MESHPARAMS_ADD(dot11MeshAwakeWindowDuration);
+	MESHPARAMS_ADD(low_ack);
+	MESHPARAMS_ADD(mcast_retries);
+	MESHPARAMS_ADD(mcast_ttl);
 #undef MESHPARAMS_ADD
 }
 #endif

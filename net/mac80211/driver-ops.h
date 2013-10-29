@@ -146,8 +146,7 @@ static inline int drv_add_interface(struct ieee80211_local *local,
 
 	if (WARN_ON(sdata->vif.type == NL80211_IFTYPE_AP_VLAN ||
 		    (sdata->vif.type == NL80211_IFTYPE_MONITOR &&
-		     !(local->hw.flags & IEEE80211_HW_WANT_MONITOR_VIF) &&
-		     !(sdata->u.mntr_flags & MONITOR_FLAG_ACTIVE))))
+		     !(local->hw.flags & IEEE80211_HW_WANT_MONITOR_VIF))))
 		return -EINVAL;
 
 	trace_drv_add_interface(local, sdata);
@@ -746,23 +745,23 @@ static inline int drv_get_survey(struct ieee80211_local *local, int idx,
 }
 
 static inline int drv_get_link_stats(struct ieee80211_local *local,
-                    struct ieee80211_sub_if_data *sdata,
-                    u8 *peer_addr,
-                    struct ieee80211_link_stats *stats)
+				     struct ieee80211_sub_if_data *sdata,
+				     u8 *peer_addr,
+				     struct ieee80211_link_stats *stats)
 {
-   int ret = -EOPNOTSUPP;
+	int ret = -EOPNOTSUPP;
 
-   might_sleep();
+	might_sleep();
 
-   trace_drv_get_link_stats(local, sdata, peer_addr, stats);
-   if (local->ops->get_link_stats) {
-       ret = local->ops->get_link_stats(&local->hw, &sdata->vif,
-                        peer_addr, stats);
-   }
+	trace_drv_get_link_stats(local, sdata, peer_addr, stats);
+	if (local->ops->get_link_stats) {
+		ret = local->ops->get_link_stats(&local->hw, &sdata->vif,
+						 peer_addr, stats);
+	}
 
-   trace_drv_return_int(local, ret);
+	trace_drv_return_int(local, ret);
 
-   return ret;
+	return ret;
 }
 
 static inline void drv_rfkill_poll(struct ieee80211_local *local)
@@ -1122,6 +1121,30 @@ static inline void drv_ipv6_addr_change(struct ieee80211_local *local,
 		local->ops->ipv6_addr_change(&local->hw, &sdata->vif, idev);
 	trace_drv_return_void(local);
 }
+#endif
+
+#ifdef CPTCFG_MAC80211_MESH
+
+static inline void drv_mesh_ps_doze(struct ieee80211_local *local, u64 nexttbtt)
+{
+	might_sleep();
+
+	trace_drv_mesh_ps_doze(local, nexttbtt);
+	if (local->ops->mesh_ps_doze)
+		local->ops->mesh_ps_doze(&local->hw, nexttbtt);
+	trace_drv_return_void(local);
+}
+
+static inline void drv_mesh_ps_wakeup(struct ieee80211_local *local)
+{
+	might_sleep();
+
+	trace_drv_mesh_ps_wakeup(local);
+	if (local->ops->mesh_ps_wakeup)
+		local->ops->mesh_ps_wakeup(&local->hw);
+	trace_drv_return_void(local);
+}
+
 #endif
 
 #endif /* __MAC80211_DRIVER_OPS */

@@ -1911,46 +1911,24 @@ TRACE_EVENT(cfg80211_send_rx_assoc,
 		  NETDEV_PR_ARG, MAC_PR_ARG(bssid), CHAN_PR_ARG)
 );
 
-DECLARE_EVENT_CLASS(netdev_frame_event,
-	TP_PROTO(struct net_device *netdev, const u8 *buf, int len),
-	TP_ARGS(netdev, buf, len),
-	TP_STRUCT__entry(
-		NETDEV_ENTRY
-		__dynamic_array(u8, frame, len)
-	),
-	TP_fast_assign(
-		NETDEV_ASSIGN;
-		memcpy(__get_dynamic_array(frame), buf, len);
-	),
-	TP_printk(NETDEV_PR_FMT ", ftype:0x%.2x",
-		  NETDEV_PR_ARG,
-		  le16_to_cpup((__le16 *)__get_dynamic_array(frame)))
+DEFINE_EVENT(netdev_evt_only, __cfg80211_send_deauth,
+	TP_PROTO(struct net_device *netdev),
+	TP_ARGS(netdev)
 );
 
-DEFINE_EVENT(netdev_frame_event, cfg80211_rx_unprot_mlme_mgmt,
-	TP_PROTO(struct net_device *netdev, const u8 *buf, int len),
-	TP_ARGS(netdev, buf, len)
+DEFINE_EVENT(netdev_evt_only, __cfg80211_send_disassoc,
+	TP_PROTO(struct net_device *netdev),
+	TP_ARGS(netdev)
 );
 
-DEFINE_EVENT(netdev_frame_event, cfg80211_rx_mlme_mgmt,
-	TP_PROTO(struct net_device *netdev, const u8 *buf, int len),
-	TP_ARGS(netdev, buf, len)
+DEFINE_EVENT(netdev_evt_only, cfg80211_send_unprot_deauth,
+	TP_PROTO(struct net_device *netdev),
+	TP_ARGS(netdev)
 );
 
-TRACE_EVENT(cfg80211_tx_mlme_mgmt,
-	TP_PROTO(struct net_device *netdev, const u8 *buf, int len),
-	TP_ARGS(netdev, buf, len),
-	TP_STRUCT__entry(
-		NETDEV_ENTRY
-		__dynamic_array(u8, frame, len)
-	),
-	TP_fast_assign(
-		NETDEV_ASSIGN;
-		memcpy(__get_dynamic_array(frame), buf, len);
-	),
-	TP_printk(NETDEV_PR_FMT ", ftype:0x%.2x",
-		  NETDEV_PR_ARG,
-		  le16_to_cpup((__le16 *)__get_dynamic_array(frame)))
+DEFINE_EVENT(netdev_evt_only, cfg80211_send_unprot_disassoc,
+	TP_PROTO(struct net_device *netdev),
+	TP_ARGS(netdev)
 );
 
 DECLARE_EVENT_CLASS(netdev_mac_evt,
@@ -2391,30 +2369,26 @@ TRACE_EVENT(cfg80211_get_bss,
 		  __entry->capa_mask, __entry->capa_val)
 );
 
-TRACE_EVENT(cfg80211_inform_bss_width_frame,
+TRACE_EVENT(cfg80211_inform_bss_frame,
 	TP_PROTO(struct wiphy *wiphy, struct ieee80211_channel *channel,
-		 enum nl80211_bss_scan_width scan_width,
 		 struct ieee80211_mgmt *mgmt, size_t len,
 		 s32 signal),
-	TP_ARGS(wiphy, channel, scan_width, mgmt, len, signal),
+	TP_ARGS(wiphy, channel, mgmt, len, signal),
 	TP_STRUCT__entry(
 		WIPHY_ENTRY
 		CHAN_ENTRY
-		__field(enum nl80211_bss_scan_width, scan_width)
 		__dynamic_array(u8, mgmt, len)
 		__field(s32, signal)
 	),
 	TP_fast_assign(
 		WIPHY_ASSIGN;
 		CHAN_ASSIGN(channel);
-		__entry->scan_width = scan_width;
 		if (mgmt)
 			memcpy(__get_dynamic_array(mgmt), mgmt, len);
 		__entry->signal = signal;
 	),
-	TP_printk(WIPHY_PR_FMT ", " CHAN_PR_FMT "(scan_width: %d) signal: %d",
-		  WIPHY_PR_ARG, CHAN_PR_ARG, __entry->scan_width,
-		  __entry->signal)
+	TP_printk(WIPHY_PR_FMT ", " CHAN_PR_FMT "signal: %d",
+		  WIPHY_PR_ARG, CHAN_PR_ARG, __entry->signal)
 );
 
 DECLARE_EVENT_CLASS(cfg80211_bss_evt,
