@@ -58,8 +58,7 @@ enum mesh_path_flags {
  * @MESH_WORK_ROOT: the mesh root station needs to send a frame
  * @MESH_WORK_DRIFT_ADJUST: time to compensate for clock drift relative to other
  * mesh nodes
- * @MESH_WORK_PS_HW_CONF: perform checks for PS mode and configure hardware
- * @MESH_WORK_PS_DOZE: perform checks for doze state and put hardware to doze
+ * @MESH_WORK_MBSS_CHANGED: rebuild beacon and notify driver of BSS changes
  */
 enum mesh_deferred_task_flags {
 	MESH_WORK_HOUSEKEEPING,
@@ -67,8 +66,7 @@ enum mesh_deferred_task_flags {
 	MESH_WORK_GROW_MPP_TABLE,
 	MESH_WORK_ROOT,
 	MESH_WORK_DRIFT_ADJUST,
-	MESH_WORK_PS_HW_CONF,
-	MESH_WORK_PS_DOZE,
+	MESH_WORK_MBSS_CHANGED,
 };
 
 /**
@@ -192,7 +190,6 @@ struct mesh_rmc {
 	u32 idx_mask;
 };
 
-#define IEEE80211_MESH_PEER_INACTIVITY_LIMIT (1800 * HZ)
 #define IEEE80211_MESH_HOUSEKEEPING_INTERVAL (60 * HZ)
 
 #define MESH_PATH_EXPIRE (600 * HZ)
@@ -212,7 +209,6 @@ int ieee80211_fill_mesh_addresses(struct ieee80211_hdr *hdr, __le16 *fc,
 				  const u8 *da, const u8 *sa);
 int ieee80211_new_mesh_header(struct ieee80211_sub_if_data *sdata,
 			      struct ieee80211s_hdr *meshhdr,
-			      const char *addr1,
 			      const char *addr4or5, const char *addr6);
 int mesh_rmc_check(struct ieee80211_sub_if_data *sdata,
 		   const u8 *addr, struct ieee80211s_hdr *mesh_hdr);
@@ -261,14 +257,6 @@ void ieee80211_mpsp_trigger_process(u8 *qc, struct sta_info *sta,
 				    bool tx, bool acked);
 void ieee80211_mps_frame_release(struct sta_info *sta,
 				 struct ieee802_11_elems *elems);
-void ieee80211_mps_hw_conf(struct ieee80211_local *local);
-void ieee80211_mps_sta_tbtt_update(struct sta_info *sta,
-				   struct ieee80211_mgmt *mgmt,
-				   const struct ieee80211_tim_ie *tim);
-void ieee80211_mps_sta_tbtt_timeout(unsigned long data);
-void ieee80211_mps_awake_window_start(struct ieee80211_sub_if_data *sdata);
-void ieee80211_mps_awake_window_end(unsigned long data);
-void ieee80211_mps_doze(struct ieee80211_local *local);
 
 /* Mesh paths */
 int mesh_nexthop_lookup(struct ieee80211_sub_if_data *sdata,
@@ -300,6 +288,7 @@ void mesh_neighbour_update(struct ieee80211_sub_if_data *sdata,
 			   u8 *hw_addr, struct ieee802_11_elems *ie);
 bool mesh_peer_accepts_plinks(struct ieee802_11_elems *ie);
 u32 mesh_accept_plinks_update(struct ieee80211_sub_if_data *sdata);
+void mesh_plink_broken(struct sta_info *sta);
 u32 mesh_plink_deactivate(struct sta_info *sta);
 u32 mesh_plink_open(struct sta_info *sta);
 u32 mesh_plink_block(struct sta_info *sta);
@@ -336,14 +325,14 @@ static inline
 u32 mesh_plink_inc_estab_count(struct ieee80211_sub_if_data *sdata)
 {
 	atomic_inc(&sdata->u.mesh.estab_plinks);
-	return mesh_accept_plinks_update(sdata);
+	return mesh_accept_plinks_update(sdata) | BSS_CHANGED_BEACON;
 }
 
 static inline
 u32 mesh_plink_dec_estab_count(struct ieee80211_sub_if_data *sdata)
 {
 	atomic_dec(&sdata->u.mesh.estab_plinks);
-	return mesh_accept_plinks_update(sdata);
+	return mesh_accept_plinks_update(sdata) | BSS_CHANGED_BEACON;
 }
 
 static inline int mesh_plink_free_count(struct ieee80211_sub_if_data *sdata)
@@ -372,7 +361,6 @@ void ieee80211_mesh_notify_scan_completed(struct ieee80211_local *local);
 
 void mesh_path_flush_by_iface(struct ieee80211_sub_if_data *sdata);
 void mesh_sync_adjust_tbtt(struct ieee80211_sub_if_data *sdata);
-void mesh_plink_broken(struct sta_info *sta);
 void ieee80211s_stop(void);
 #else
 static inline void
@@ -381,7 +369,6 @@ static inline bool mesh_path_sel_is_hwmp(struct ieee80211_sub_if_data *sdata)
 { return false; }
 static inline void mesh_path_flush_by_iface(struct ieee80211_sub_if_data *sdata)
 {}
-static inline void mesh_plink_broken(struct sta_info *sta) {}
 static inline void ieee80211s_stop(void) {}
 #endif
 

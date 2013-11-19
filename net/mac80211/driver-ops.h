@@ -146,7 +146,8 @@ static inline int drv_add_interface(struct ieee80211_local *local,
 
 	if (WARN_ON(sdata->vif.type == NL80211_IFTYPE_AP_VLAN ||
 		    (sdata->vif.type == NL80211_IFTYPE_MONITOR &&
-		     !(local->hw.flags & IEEE80211_HW_WANT_MONITOR_VIF))))
+		     !(local->hw.flags & IEEE80211_HW_WANT_MONITOR_VIF) &&
+		     !(sdata->u.mntr_flags & MONITOR_FLAG_ACTIVE))))
 		return -EINVAL;
 
 	trace_drv_add_interface(local, sdata);
@@ -1123,28 +1124,44 @@ static inline void drv_ipv6_addr_change(struct ieee80211_local *local,
 }
 #endif
 
-#ifdef CPTCFG_MAC80211_MESH
-
-static inline void drv_mesh_ps_doze(struct ieee80211_local *local, u64 nexttbtt)
+static inline void
+drv_channel_switch_beacon(struct ieee80211_sub_if_data *sdata,
+			  struct cfg80211_chan_def *chandef)
 {
-	might_sleep();
+	struct ieee80211_local *local = sdata->local;
 
-	trace_drv_mesh_ps_doze(local, nexttbtt);
-	if (local->ops->mesh_ps_doze)
-		local->ops->mesh_ps_doze(&local->hw, nexttbtt);
-	trace_drv_return_void(local);
+	if (local->ops->channel_switch_beacon) {
+		trace_drv_channel_switch_beacon(local, sdata, chandef);
+		local->ops->channel_switch_beacon(&local->hw, &sdata->vif,
+						  chandef);
+	}
 }
 
-static inline void drv_mesh_ps_wakeup(struct ieee80211_local *local)
+static inline int drv_join_ibss(struct ieee80211_local *local,
+				struct ieee80211_sub_if_data *sdata)
 {
-	might_sleep();
+	int ret = 0;
 
-	trace_drv_mesh_ps_wakeup(local);
-	if (local->ops->mesh_ps_wakeup)
-		local->ops->mesh_ps_wakeup(&local->hw);
-	trace_drv_return_void(local);
+	might_sleep();
+	check_sdata_in_driver(sdata);
+
+	trace_drv_join_ibss(local, sdata, &sdata->vif.bss_conf);
+	if (local->ops->join_ibss)
+		ret = local->ops->join_ibss(&local->hw, &sdata->vif);
+	trace_drv_return_int(local, ret);
+	return ret;
 }
 
-#endif
+static inline void drv_leave_ibss(struct ieee80211_local *local,
+				  struct ieee80211_sub_if_data *sdata)
+{
+	might_sleep();
+	check_sdata_in_driver(sdata);
+
+	trace_drv_leave_ibss(local, sdata);
+	if (local->ops->leave_ibss)
+		local->ops->leave_ibss(&local->hw, &sdata->vif);
+	trace_drv_return_void(local);
+}
 
 #endif /* __MAC80211_DRIVER_OPS */

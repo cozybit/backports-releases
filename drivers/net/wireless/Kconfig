@@ -36,7 +36,6 @@ config PCMCIA_RAYCS
 
 config LIBERTAS_THINFIRM
 	depends on !BACKPORT_KERNEL_2_6_27
-	depends on n
 	tristate "Marvell 8xxx Libertas WLAN driver support with thin firmware"
 	depends on m
 	depends on MAC80211
@@ -121,7 +120,6 @@ config PCMCIA_ATMEL
 	  Atmel at76c502 and at76c504 chips.
 
 config AT76C50X_USB
-	depends on n
         tristate "Atmel at76c503/at76c505/at76c505a USB cards"
         depends on m
         depends on MAC80211 && USB
@@ -211,14 +209,13 @@ config USB_ZD1201
 
 config USB_NET_RNDIS_WLAN
 	depends on !BACKPORT_KERNEL_2_6_29
-	depends on n
 	tristate "Wireless RNDIS USB support"
 	depends on m
 	depends on USB
 	depends on CFG80211
-	depends on USB_USBNET
-	depends on USB_NET_CDCETHER
-	depends on USB_NET_RNDIS_HOST
+	select USB_USBNET
+	select USB_NET_CDCETHER
+	select USB_NET_RNDIS_HOST
 	---help---
 	  This is a driver for wireless RNDIS devices.
 	  These are USB based adapters found in devices such as:
@@ -240,10 +237,9 @@ config USB_NET_RNDIS_WLAN
 
 	  If you choose to build a module, it'll be called rndis_wlan.
 
-#source "drivers/net/wireless/rtl818x/Kconfig"
+source "drivers/net/wireless/rtl818x/Kconfig"
 
 config ADM8211
-	depends on n
 	tristate "ADMtek ADM8211 support"
 	depends on m
 	depends on MAC80211 && PCI
@@ -273,7 +269,6 @@ config ADM8211
 
 config MAC80211_HWSIM
 	depends on !BACKPORT_KERNEL_2_6_31
-	depends on n
 	tristate "Simulated radio testing tool for mac80211"
 	depends on m
 	depends on MAC80211
@@ -288,7 +283,6 @@ config MAC80211_HWSIM
 	  called mac80211_hwsim.  If unsure, say N.
 
 config MWL8K
-	depends on n
 	tristate "Marvell 88W8xxx PCI/PCIe Wireless support"
 	depends on m
 	depends on MAC80211 && PCI
@@ -299,21 +293,21 @@ config MWL8K
 	  will be called mwl8k.  If unsure, say N.
 
 source "drivers/net/wireless/ath/Kconfig"
-#source "drivers/net/wireless/b43/Kconfig"
-#source "drivers/net/wireless/b43legacy/Kconfig"
-#source "drivers/net/wireless/brcm80211/Kconfig"
+source "drivers/net/wireless/b43/Kconfig"
+source "drivers/net/wireless/b43legacy/Kconfig"
+source "drivers/net/wireless/brcm80211/Kconfig"
 #source "drivers/net/wireless/hostap/Kconfig"
-#source "drivers/net/wireless/ipw2x00/Kconfig"
-#source "drivers/net/wireless/iwlwifi/Kconfig"
-#source "drivers/net/wireless/iwlegacy/Kconfig"
-#source "drivers/net/wireless/libertas/Kconfig"
-#source "drivers/net/wireless/mwl8787/Kconfig"
-#source "drivers/net/wireless/orinoco/Kconfig"
-#source "drivers/net/wireless/p54/Kconfig"
-#source "drivers/net/wireless/rt2x00/Kconfig"
-#source "drivers/net/wireless/rtlwifi/Kconfig"
-#source "drivers/net/wireless/ti/Kconfig"
-#source "drivers/net/wireless/zd1211rw/Kconfig"
-#source "drivers/net/wireless/mwifiex/Kconfig"
+source "drivers/net/wireless/ipw2x00/Kconfig"
+source "drivers/net/wireless/iwlwifi/Kconfig"
+source "drivers/net/wireless/iwlegacy/Kconfig"
+source "drivers/net/wireless/libertas/Kconfig"
+source "drivers/net/wireless/orinoco/Kconfig"
+source "drivers/net/wireless/p54/Kconfig"
+source "drivers/net/wireless/rt2x00/Kconfig"
+source "drivers/net/wireless/rtlwifi/Kconfig"
+source "drivers/net/wireless/ti/Kconfig"
+source "drivers/net/wireless/zd1211rw/Kconfig"
+source "drivers/net/wireless/mwifiex/Kconfig"
+source "drivers/net/wireless/cw1200/Kconfig"
 
 endif # WLAN

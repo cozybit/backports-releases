@@ -15,7 +15,6 @@ modules.order
 backport-include/backport/autoconf.h
 modules
 kconf/mconf
-kconfig/conf
 kconf/conf
 .tmp_versions
 Module.symvers
